@@ -1,0 +1,4 @@
+https://huggingface.co/Jacobo/grc_proiel_trf/resolve/main/grc_proiel_trf-3.7.5-py3-none-any.whl
+grecy
+polars
+MyCapytain
