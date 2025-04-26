@@ -1,4 +1,5 @@
-# %%
+# %% [python] Initialize libraries, constants, and basic functions
+
 from MyCapytain.resources.texts.local.capitains.cts import CapitainsCtsText
 from MyCapytain.common.constants import Mimetypes
 import polars as pl
@@ -38,7 +39,7 @@ def get_speech_for_ref(ref: list[int]):
 
     return None
 
-# %%
+
 def thuc_to_table():
     """
     See https://mycapytain.readthedocs.io/en/latest/MyCapytain.local.html
@@ -71,7 +72,7 @@ def thuc_to_table():
         }
     )
 
-# %%
+
 def save_df(df: pl.DataFrame) -> pl.DataFrame:
     df = thuc_to_table().with_columns(
         pl.col("passage")
@@ -83,19 +84,15 @@ def save_df(df: pl.DataFrame) -> pl.DataFrame:
 
     return df
 
-# %%
+
 def restore_df():
     return pl.read_parquet(THUCYDIDES_PARQUET).with_columns(
         pl.col("parsed_passage").map_elements(
             lambda p: list(spacy_tokens.DocBin().from_bytes(p).get_docs(nlp.vocab))[0])
     )
 
-# %%
+# %% [python]
 df = restore_df()
-
-# %%
-for token in df['parsed_passage'][1001]:
-    print((token, token.lemma_, token.pos_, token.dep_, token.morph.to_dict()))
 # %%
 
 def count_finite_potential_optatives(tokens: list[spacy_tokens.Token]) -> int:
@@ -154,5 +151,11 @@ df = df.with_columns(
     ).alias("n?_inf_opt"),
 )
 
-# %%python
+# %% [markdown]
+# Count potential optatives. We can be fairly certain that finite-optatives
+# with ἄν are potential, but we also need to count possible matches with
+# participles and infinitives. These will require manual confirmation.
+
+
+# %% [python]
 df.filter(pl.col("speech_id") == 100).select(pl.col("n_pot_opt", "n?_part_opt", "n?_inf_opt", "reference", "passage")).sum()
