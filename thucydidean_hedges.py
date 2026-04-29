@@ -88,12 +88,17 @@ def save_df(df: pl.DataFrame) -> pl.DataFrame:
 def restore_df():
     return pl.read_parquet(THUCYDIDES_PARQUET).with_columns(
         pl.col("parsed_passage").map_elements(
-            lambda p: list(spacy_tokens.DocBin().from_bytes(p).get_docs(nlp.vocab))[0])
+            lambda p: list(spacy.tokens.DocBin().from_bytes(p).get_docs(nlp.vocab))[0],
+            return_dtype=pl.Object,
+        )
     )
 
 # %% [python]
 df = restore_df()
 # %%
+
+def clause_has_an(token):
+    return any("ἄν" == t.text for t in token.sent if t.head == token.head or t.head == token)
 
 def count_finite_potential_optatives(tokens: list[spacy_tokens.Token]) -> int:
     n_potential_optatives = 0
@@ -102,11 +107,12 @@ def count_finite_potential_optatives(tokens: list[spacy_tokens.Token]) -> int:
         if (
             token.pos_ == "VERB"
             and token.morph.to_dict().get("Mood") == "Opt"
-            and "ἄν" in [t.lemma_ for t in token.children]
+            and ("ἄν" in [t.lemma_ for t in token.children] or clause_has_an(token))
         ):
             n_potential_optatives += 1
 
     return n_potential_optatives
+
 
 def count_possible_participial_potential_optatives(tokens: list[spacy_tokens.Token]) -> int:
     n_optatives = 0
@@ -115,7 +121,7 @@ def count_possible_participial_potential_optatives(tokens: list[spacy_tokens.Tok
         if (
             token.pos_ == "VERB"
             and token.morph.to_dict().get("VerbForm") == "Part"
-            and "ἄν" in [t.lemma_ for t in token.children]
+            and ("ἄν" in [t.lemma_ for t in token.children] or clause_has_an(token))
         ):
             n_optatives += 1
 
@@ -129,7 +135,7 @@ def count_possible_infinitival_potential_optatives(tokens: list[spacy_tokens.Tok
         if (
             token.pos_ == "VERB"
             and token.morph.to_dict().get("VerbForm") == "Inf"
-            and "ἄν" in [t.lemma_ for t in token.children]
+            and ("ἄν" in [t.lemma_ for t in token.children] or clause_has_an(token))
         ):
             n_optatives += 1
 
@@ -158,4 +164,41 @@ df = df.with_columns(
 
 
 # %% [python]
-df.filter(pl.col("speech_id") == 100).select(pl.col("n_pot_opt", "n?_part_opt", "n?_inf_opt", "reference", "passage")).sum()
+df.select(pl.col("n_pot_opt", "n?_part_opt", "n?_inf_opt", "reference", "passage")).sum()
+
+# %% [python]
+speech_stats = (
+    df
+    .filter(pl.col("speech_id").is_not_null())
+    .with_columns(
+        pl.col("parsed_passage").map_elements(len, return_dtype=pl.UInt32).alias("n_tokens"),
+        (pl.col("n_pot_opt") + pl.col("n?_part_opt") + pl.col("n?_inf_opt")).alias("n_pot_opt_total"),
+    )
+    .with_columns(
+        (pl.col("n_pot_opt_total") / pl.col("n_tokens") * 1000).alias("opt_per_1000_tokens"),
+    )
+    .group_by("speech_id", "speaker", "location")
+    .agg(
+        pl.col("n_pot_opt_total").sum(),
+        pl.col("n_tokens").sum(),
+    ).with_columns(
+        (pl.col("n_pot_opt_total") / pl.col("n_tokens") * 1000).alias("opt_per_1000_tokens"),
+    )
+)
+
+# %%
+speech_stats.sort("n_pot_opt_total", descending=True)
+# %%
+total_pot_optatives = speech_stats["n_pot_opt_total"].sum()
+total_tokens_in_speeches = speech_stats["n_tokens"].sum()
+
+expected_ratio = total_pot_optatives / total_tokens_in_speeches
+expected_frequency_per_1000_tokens = expected_ratio * 1000
+
+# %%
+speech_stats.with_columns(
+    (pl.col("n_tokens") * expected_ratio).alias("expected_pot_opt_total"),
+).with_columns(
+    (pl.col("n_pot_opt_total") - pl.col("expected_pot_opt_total")).alias("actual - expected")
+).sort("actual - expected").write_csv("thucydidean_hedges.csv")
+# %%
