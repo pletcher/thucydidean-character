@@ -1,0 +1,18 @@
+[project]
+name = "2025-04-11-thucydidean-hedges"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "grc-proiel-trf",
+    "grecy>=1.0",
+    "jupyterlab>=4.5.6",
+    "mycapytain>=3.0.2",
+    "polars>=1.40.1",
+    "spacy>=3.8.14",
+    "tokenizers==0.23.1",
+]
+
+[tool.uv.sources]
+grc-proiel-trf = { url = "https://huggingface.co/Jacobo/grc_proiel_trf/resolve/main/grc_proiel_trf-3.7.5-py3-none-any.whl" }
