@@ -17,3 +17,8 @@ dependencies = [
 
 [tool.uv.sources]
 grc-proiel-trf = { url = "https://huggingface.co/Jacobo/grc_proiel_trf/resolve/main/grc_proiel_trf-3.7.5-py3-none-any.whl" }
+
+[dependency-groups]
+dev = [
+    "ruff>=0.15.12",
+]

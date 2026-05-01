@@ -17,6 +17,7 @@ SPEECHES = pl.read_csv("./thuc-speeches.tsv", separator="\t").with_columns(
 
 THUCYDIDES_PARQUET = "thucydides.parquet"
 
+
 def get_speech_for_ref(ref: list[int]):
     for speech in SPEECHES.iter_rows(named=True):
         ref_is_after_speech_start = True
@@ -93,12 +94,17 @@ def restore_df():
         )
     )
 
+
 # %% [python]
 df = restore_df()
 # %%
 
+
 def clause_has_an(token):
-    return any("ἄν" == t.text for t in token.sent if t.head == token.head or t.head == token)
+    return any(
+        "ἄν" == t.text for t in token.sent if t.head == token.head or t.head == token
+    )
+
 
 def count_finite_potential_optatives(tokens: list[spacy_tokens.Token]) -> int:
     n_potential_optatives = 0
@@ -114,7 +120,9 @@ def count_finite_potential_optatives(tokens: list[spacy_tokens.Token]) -> int:
     return n_potential_optatives
 
 
-def count_possible_participial_potential_optatives(tokens: list[spacy_tokens.Token]) -> int:
+def count_possible_participial_potential_optatives(
+    tokens: list[spacy_tokens.Token],
+) -> int:
     n_optatives = 0
 
     for token in tokens:
@@ -128,7 +136,9 @@ def count_possible_participial_potential_optatives(tokens: list[spacy_tokens.Tok
     return n_optatives
 
 
-def count_possible_infinitival_potential_optatives(tokens: list[spacy_tokens.Token]) -> int:
+def count_possible_infinitival_potential_optatives(
+    tokens: list[spacy_tokens.Token],
+) -> int:
     n_optatives = 0
 
     for token in tokens:
@@ -143,18 +153,19 @@ def count_possible_infinitival_potential_optatives(tokens: list[spacy_tokens.Tok
 
 
 df = df.with_columns(
-    pl.col("parsed_passage").map_elements(
-        count_finite_potential_optatives,
-        return_dtype=pl.Int64
-    ).alias("n_pot_opt"),
-    pl.col("parsed_passage").map_elements(
-        count_possible_participial_potential_optatives,
-        return_dtype=pl.Int64
-    ).alias("n?_part_opt"),
-    pl.col("parsed_passage").map_elements(
-        count_possible_infinitival_potential_optatives,
-        return_dtype=pl.Int64
-    ).alias("n?_inf_opt"),
+    pl.col("parsed_passage")
+    .map_elements(count_finite_potential_optatives, return_dtype=pl.Int64)
+    .alias("n_pot_opt"),
+    pl.col("parsed_passage")
+    .map_elements(count_possible_participial_potential_optatives, return_dtype=pl.Int64)
+    .alias("n?_part_opt"),
+    pl.col("parsed_passage")
+    .map_elements(count_possible_infinitival_potential_optatives, return_dtype=pl.Int64)
+    .alias("n?_inf_opt"),
+).with_columns(
+    (pl.col("n_pot_opt") + pl.col("n?_part_opt") + pl.col("n?_inf_opt")).alias(
+        "n_pot_opt_total"
+    )
 )
 
 # %% [markdown]
@@ -164,25 +175,33 @@ df = df.with_columns(
 
 
 # %% [python]
-df.select(pl.col("n_pot_opt", "n?_part_opt", "n?_inf_opt", "reference", "passage")).sum()
+df.select(pl.col("n_pot_opt", "n?_part_opt", "n?_inf_opt")).sum()
 
 # %% [python]
 speech_stats = (
-    df
-    .filter(pl.col("speech_id").is_not_null())
+    df.filter(pl.col("speech_id").is_not_null())
     .with_columns(
-        pl.col("parsed_passage").map_elements(len, return_dtype=pl.UInt32).alias("n_tokens"),
-        (pl.col("n_pot_opt") + pl.col("n?_part_opt") + pl.col("n?_inf_opt")).alias("n_pot_opt_total"),
+        pl.col("parsed_passage")
+        .map_elements(len, return_dtype=pl.UInt32)
+        .alias("n_tokens"),
+        (pl.col("n_pot_opt") + pl.col("n?_part_opt") + pl.col("n?_inf_opt")).alias(
+            "n_pot_opt_total"
+        ),
     )
     .with_columns(
-        (pl.col("n_pot_opt_total") / pl.col("n_tokens") * 1000).alias("opt_per_1000_tokens"),
+        (pl.col("n_pot_opt_total") / pl.col("n_tokens") * 1000).alias(
+            "opt_per_1000_tokens"
+        ),
     )
     .group_by("speech_id", "speaker", "location")
     .agg(
         pl.col("n_pot_opt_total").sum(),
         pl.col("n_tokens").sum(),
-    ).with_columns(
-        (pl.col("n_pot_opt_total") / pl.col("n_tokens") * 1000).alias("opt_per_1000_tokens"),
+    )
+    .with_columns(
+        (pl.col("n_pot_opt_total") / pl.col("n_tokens") * 1000).alias(
+            "opt_per_1000_tokens"
+        ),
     )
 )
 
@@ -199,6 +218,82 @@ expected_frequency_per_1000_tokens = expected_ratio * 1000
 speech_stats.with_columns(
     (pl.col("n_tokens") * expected_ratio).alias("expected_pot_opt_total"),
 ).with_columns(
-    (pl.col("n_pot_opt_total") - pl.col("expected_pot_opt_total")).alias("actual - expected")
-).sort("actual - expected").write_csv("thucydidean_hedges.csv")
+    (pl.col("n_pot_opt_total") - pl.col("expected_pot_opt_total")).alias(
+        "actual - expected"
+    )
+).sort(
+    "actual - expected"
+)  # .write_csv("thucydidean_hedges.csv")
 # %%
+## dispersion
+
+import math
+import numpy as np
+
+
+# def dispersion(grouped_df):
+#     parsed_passage = grouped_df["parsed_passage"]
+#     rel_freq_pot_opt = []
+
+#     for passage in parsed_passage:
+#         n_optatives = (
+#             count_finite_potential_optatives(passage)
+#             + count_possible_infinitival_potential_optatives(passage)
+#             + count_possible_participial_potential_optatives(passage)
+#         ) * 2  # multiply by two because each pot. optative is two tokens
+#         passage_length = len(passage)
+
+#         rel_freq_pot_opt.append(n_optatives / passage_length)
+
+#     # numpy calculates the population std. dev.
+#     # by default, which is what we want here
+#     std_dev = np.std(rel_freq_pot_opt)
+#     mean = np.mean(rel_freq_pot_opt)
+
+#     var_coef = std_dev / mean
+#     corpus_size = len(parsed_passage)
+
+#     juilland_d = 1 - (var_coef * (1 / math.sqrt(corpus_size - 1)))
+
+
+# df.filter(pl.col("speech_id").is_not_null(), pl.col("n_pot_opt_total") > 0).select(
+#     ["reference", "speech_id", "speaker", "location", "parsed_passage"]
+# ).group_by(["speech_id", "speaker", "location"]).map_groups(dispersion)
+
+(
+    df.filter(pl.col("speech_id").is_not_null(), pl.col("n_pot_opt_total") > 0)
+    .select(["reference", "speech_id", "speaker", "location", "parsed_passage"])
+    .with_columns(
+        pl.col("parsed_passage")
+        .map_elements(
+            lambda p: (
+                count_finite_potential_optatives(p)
+                + count_possible_infinitival_potential_optatives(p)
+                + count_possible_participial_potential_optatives(p)
+            )
+            * 2,
+            return_dtype=pl.Int64,
+        )
+        .alias("n_opt"),
+        pl.col("parsed_passage")
+        .map_elements(len, return_dtype=pl.Int64)
+        .alias("passage_length"),
+    )
+    .with_columns((pl.col("n_opt") / pl.col("passage_length")).alias("opt_rel_freq"))
+    .group_by(["speech_id", "speaker", "location"])
+    .agg(
+        pl.col("opt_rel_freq")
+        .std(ddof=0)
+        .alias("std_dev"),  # population std dev, matching np.std default
+        pl.col("opt_rel_freq").mean().alias("mean"),
+        pl.col("opt_rel_freq").count().alias("corpus_size"),
+    )
+    .with_columns(
+        (pl.col("std_dev") / pl.col("mean")).alias("var_coef"),
+    )
+    .with_columns(
+        (1 - (pl.col("var_coef") / (pl.col("corpus_size") - 1).sqrt())).alias(
+            "juilland_d"
+        )
+    )
+).sort("juilland_d", descending=True) # .write_csv("./optative_juilland_d.csv")
