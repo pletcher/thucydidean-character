@@ -287,6 +287,7 @@ import numpy as np
         .alias("std_dev"),  # population std dev, matching np.std default
         pl.col("opt_rel_freq").mean().alias("mean"),
         pl.col("opt_rel_freq").count().alias("corpus_size"),
+        pl.col("n_opt").sum()
     )
     .with_columns(
         (pl.col("std_dev") / pl.col("mean")).alias("var_coef"),
@@ -296,4 +297,4 @@ import numpy as np
             "juilland_d"
         )
     )
-).sort("juilland_d", descending=True) # .write_csv("./optative_juilland_d.csv")
+).sort(["n_opt", "juilland_d"], descending=True).write_csv("./optative_juilland_d.csv")
