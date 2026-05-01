@@ -227,39 +227,6 @@ speech_stats.with_columns(
 # %%
 ## dispersion
 
-import math
-import numpy as np
-
-
-# def dispersion(grouped_df):
-#     parsed_passage = grouped_df["parsed_passage"]
-#     rel_freq_pot_opt = []
-
-#     for passage in parsed_passage:
-#         n_optatives = (
-#             count_finite_potential_optatives(passage)
-#             + count_possible_infinitival_potential_optatives(passage)
-#             + count_possible_participial_potential_optatives(passage)
-#         ) * 2  # multiply by two because each pot. optative is two tokens
-#         passage_length = len(passage)
-
-#         rel_freq_pot_opt.append(n_optatives / passage_length)
-
-#     # numpy calculates the population std. dev.
-#     # by default, which is what we want here
-#     std_dev = np.std(rel_freq_pot_opt)
-#     mean = np.mean(rel_freq_pot_opt)
-
-#     var_coef = std_dev / mean
-#     corpus_size = len(parsed_passage)
-
-#     juilland_d = 1 - (var_coef * (1 / math.sqrt(corpus_size - 1)))
-
-
-# df.filter(pl.col("speech_id").is_not_null(), pl.col("n_pot_opt_total") > 0).select(
-#     ["reference", "speech_id", "speaker", "location", "parsed_passage"]
-# ).group_by(["speech_id", "speaker", "location"]).map_groups(dispersion)
-
 (
     df.filter(pl.col("speech_id").is_not_null(), pl.col("n_pot_opt_total") > 0)
     .select(["reference", "speech_id", "speaker", "location", "parsed_passage"])
