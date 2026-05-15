@@ -122,15 +122,34 @@ def calculate_ttr(passage_strs, n=4):
     return types / tokens
 
 
+def calculate_true_ttr(passage_strs, n=4):
+    tokens = []
+
+    for p in passage_strs:
+        no_punctuation = p.replace("‘", "").translate(
+            str.maketrans("", "", string.punctuation)
+        )
+        tokens += [s for s in no_punctuation.split() if s.strip() != ""]
+
+    n_types = len(set(tokens))
+    n_tokens = len(tokens)
+
+    return n_types / n_tokens
+
+
 speeches_ttr = calculate_ttr(speeches_df["passage"].explode())
 narrative_ttr = calculate_ttr(narrative_df["passage"].explode())
 
 print(f"Speeches TTR: {speeches_ttr}")
 print(f"Narrative TTR: {narrative_ttr}")
 
+speeches_true_ttr = calculate_true_ttr(speeches_df["passage"].explode())
+narrative_true_ttr = calculate_true_ttr(narrative_df["passage"].explode())
+
+print(f"Speeches true TTR (space-delimited): {speeches_true_ttr}")
+print(f"Narrative true TTR (space-delimited): {narrative_true_ttr}")
+
 # %%
-
-
 def speeches_to_txt():
     import re
 
@@ -143,6 +162,10 @@ def speeches_to_txt():
 
         print(f"{speaker} in {location} TTR: {ttr}")
 
+        true_ttr = calculate_true_ttr(passages)
+
+        print(f"{speaker} in {location} true TTR (space-delimited): {true_ttr}")
+
         filename = f"speeches/{speaker}_{location}.txt"
 
         with open(filename, "w") as f:
@@ -153,4 +176,23 @@ def speeches_to_txt():
             f.write(cleaned_passages)
 
 
+# %%
+def lemmatize_speeches():
+    from pathlib import Path
+
+    SPEECHES = Path("speeches").glob("./*.txt")
+
+    for speech in SPEECHES:
+        with open(speech) as f:
+            doc = nlp(f.read())
+
+        with open(f"{str(speech).replace(speech.suffix, ".lemmatized.txt")}", "w") as f:
+            lemmata = [t.lemma_ for t in doc]
+
+            f.write("\n".join(lemmata))
+
+
+# %%
+
+lemmatize_speeches()
 # %%
