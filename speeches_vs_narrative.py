@@ -1,4 +1,5 @@
 # %% [python] Initialize libraries, constants, and basic functions
+from pathlib import Path
 
 from MyCapytain.resources.texts.local.capitains.cts import CapitainsCtsText
 from MyCapytain.common.constants import Mimetypes
@@ -178,8 +179,6 @@ def speeches_to_txt():
 
 # %%
 def lemmatize_speeches():
-    from pathlib import Path
-
     SPEECHES = Path("speeches").glob("./*.txt")
 
     for speech in SPEECHES:
@@ -194,5 +193,21 @@ def lemmatize_speeches():
 
 # %%
 
-lemmatize_speeches()
+
+def lemmatize_narrative():
+    filename = Path("narrative") / "narrative.lemmatized.txt"
+
+    with open(filename, "w") as f:
+        for row in narrative_df.iter_rows():
+            text = row[1]
+            doc = nlp(text)
+
+            print(
+                "\n".join([t.lemma_ for t in doc if t.lemma_.strip() != ""]),
+                sep="\n",
+                file=f,
+            )
+
+
+lemmatize_narrative()
 # %%
